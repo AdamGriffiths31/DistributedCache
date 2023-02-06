@@ -2,6 +2,7 @@ package distributedcache
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -22,6 +23,12 @@ func (c *Cache) Set(key, value []byte, ttl time.Duration) error {
 	defer c.lock.Unlock()
 
 	c.data[string(key)] = value
+	log.Printf("SET %s to %s\n", string(key), string(value))
+
+	go func() {
+		<-time.After(ttl)
+		delete(c.data, string(key))
+	}()
 
 	return nil
 }
@@ -30,11 +37,14 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
+	log.Printf("GET  %s\n", string(key))
+
 	keyString := string(key)
 	val, ok := c.data[keyString]
 	if !ok {
 		return nil, fmt.Errorf("key (%s) not found", keyString)
 	}
+	log.Printf("GET  %s = %s\n", string(key), val)
 
 	return val, nil
 }

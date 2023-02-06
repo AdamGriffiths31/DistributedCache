@@ -2,6 +2,7 @@ package main
 
 import (
 	distributedcache "DistributedCache/cache"
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -58,5 +59,57 @@ func (s *Server) handleConn(conn net.Conn) {
 
 		msg := buf[:n]
 		fmt.Println(string(msg))
+
+		go s.handleCommand(conn, buf[:n])
 	}
+}
+
+func (s *Server) handleCommand(conn net.Conn, rawCmd []byte) {
+
+	msg, err := ParseMessage(rawCmd)
+	if err != nil {
+		log.Printf("handleCommandd error: %s\n", err)
+		return
+	}
+
+	switch msg.Cmd {
+	case CMDSet:
+		err = s.handleSetCommand(conn, msg)
+	case CMDGet:
+		err = s.handleGETCommand(conn, msg)
+
+	}
+
+	if err != nil {
+		fmt.Println("handleCommand error:", err)
+		conn.Write([]byte(err.Error()))
+	}
+}
+
+func (s *Server) handleSetCommand(conn net.Conn, msg *Message) error {
+	fmt.Printf("handle SET command %v\n", msg)
+
+	if err := s.cache.Set(msg.Key, msg.Value, msg.TTL); err != nil {
+		return err
+	}
+
+	go s.sendToFollowers(context.TODO(), msg)
+
+	return nil
+}
+
+func (s *Server) handleGETCommand(conn net.Conn, msg *Message) error {
+	fmt.Printf("handle GET command %v\n", msg)
+
+	value, err := s.cache.Get(msg.Key)
+	if err != nil {
+		return err
+	}
+
+	conn.Write(value)
+	return nil
+}
+
+func (s *Server) sendToFollowers(ctx context.Context, msg *Message) error {
+	return nil
 }
