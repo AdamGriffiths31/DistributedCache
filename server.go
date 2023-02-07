@@ -11,17 +11,20 @@ import (
 type ServerOpts struct {
 	ListenAddr string
 	IsLeader   bool
+	LeaderAddr string
 }
 
 type Server struct {
 	ServerOpts
-	cache distributedcache.Cacher
+	cache     distributedcache.Cacher
+	followers map[net.Conn]struct{}
 }
 
 func NewServer(opts ServerOpts, c distributedcache.Cacher) *Server {
 	return &Server{
 		ServerOpts: opts,
 		cache:      c,
+		followers:  make(map[net.Conn]struct{}),
 	}
 }
 
@@ -32,6 +35,17 @@ func (s *Server) Start() error {
 	}
 
 	log.Printf("server staring on port [%s]\n", s.ListenAddr)
+
+	if !s.IsLeader {
+		go func() {
+			conn, err := net.Dial("tcp", s.LeaderAddr)
+			fmt.Printf("connected with leader: [%v]", s.LeaderAddr)
+			if err != nil {
+				log.Printf("Start dial [%v] error %v", s.LeaderAddr, err)
+			}
+			s.handleConn(conn)
+		}()
+	}
 
 	for {
 		conn, err := ln.Accept()
@@ -48,6 +62,10 @@ func (s *Server) handleConn(conn net.Conn) {
 	defer func() {
 		conn.Close()
 	}()
+
+	if s.IsLeader {
+		s.followers[conn] = struct{}{}
+	}
 
 	buf := make([]byte, 2048)
 	for {
@@ -111,5 +129,13 @@ func (s *Server) handleGETCommand(conn net.Conn, msg *Message) error {
 }
 
 func (s *Server) sendToFollowers(ctx context.Context, msg *Message) error {
+	for conn := range s.followers {
+		fmt.Printf("forwarding to followers: %v", msg)
+		_, err := conn.Write(msg.ToBytes())
+		if err != nil {
+			log.Printf("sendToFollowers error: %v", err)
+			continue
+		}
+	}
 	return nil
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	distributedcache "DistributedCache/cache"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -9,9 +10,14 @@ import (
 )
 
 func main() {
+	listenAddr := flag.String("listenaddr", ":8080", "listen address of the server")
+	leaderAddr := flag.String("leaderaddr", "", "listen address of the leader")
+	flag.Parse()
+
 	opts := ServerOpts{
-		ListenAddr: ":8080",
-		IsLeader:   true,
+		ListenAddr: *listenAddr,
+		IsLeader:   len(*leaderAddr) == 0,
+		LeaderAddr: *leaderAddr,
 	}
 
 	go func() {
