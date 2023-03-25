@@ -2,9 +2,12 @@ package main
 
 import (
 	distributedcache "DistributedCache/cache"
+	"DistributedCache/client"
+	"context"
 	"flag"
+	"fmt"
 	"log"
-	"net"
+	"time"
 )
 
 func main() {
@@ -18,35 +21,33 @@ func main() {
 		LeaderAddr: *leaderAddr,
 	}
 
-	// go func() {
-	// 	time.Sleep(time.Second * 2)
-	// 	conn, err := net.Dial("tcp", ":8080")
-	// 	if err != nil {
-	// 		log.Fatal(err)
-	// 	}
+	go func() {
+		client, err := client.NewClient(":8080", client.Options{})
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	// 	conn.Write([]byte("SET Foo Bar 999999999999"))
-	// 	time.Sleep(time.Second * 2)
-	// 	conn.Write([]byte("GET Foo"))
-	// 	buf := make([]byte, 1000)
-	// 	n, _ := conn.Read(buf)
-	// 	fmt.Println(string(buf[:n]))
-	// }()
+		time.Sleep(time.Second * 2)
+		for i := 0; i < 10; i++ {
+			time.Sleep(time.Millisecond * 500)
+			SendCommand(client)
+		}
+
+		client.Close()
+		time.Sleep(time.Second * 2)
+	}()
 
 	server := NewServer(opts, distributedcache.NewCache())
 	server.Start()
 }
 
-func SendCommand() {
-	cmd := &CommandSet{
-		Key:   []byte("Foo"),
-		Value: []byte("Bar"),
-		TTL:   2,
-	}
-	conn, err := net.Dial("tcp", ":8080")
+func SendCommand(c *client.Client) {
+
+	resp, err := c.Set(context.Background(), []byte("Foo"), []byte("Bar"), 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	conn.Write(cmd.Bytes())
+	fmt.Println("resp:", resp)
+
 }

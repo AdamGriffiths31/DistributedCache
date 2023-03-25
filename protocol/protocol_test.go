@@ -1,4 +1,4 @@
-package main
+package protocol
 
 import (
 	"bytes"
@@ -15,7 +15,10 @@ func TestParseSetCommand(t *testing.T) {
 	}
 
 	r := bytes.NewReader(cmd.Bytes())
-	parsedCmd := parseCommand(r)
+	parsedCmd, err := ParseCommand(r)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	assert.Equal(t, cmd, parsedCmd)
 }
@@ -26,7 +29,17 @@ func TestParseGetCommand(t *testing.T) {
 	}
 
 	r := bytes.NewReader(cmd.Bytes())
-	parsedCmd := parseCommand(r)
+	parsedCmd, err := ParseCommand(r)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	assert.Equal(t, cmd, parsedCmd)
+}
+
+func TestInvalidCommand(t *testing.T) {
+	cmd := []byte{0x00, 0x00, 0x00, 0x00}
+	r := bytes.NewReader(cmd)
+	_, err := ParseCommand(r)
+	assert.Error(t, err)
 }

@@ -1,8 +1,9 @@
-package main
+package protocol
 
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 )
 
@@ -50,17 +51,19 @@ func (c *CommandGet) Bytes() []byte {
 	return buf.Bytes()
 }
 
-func parseCommand(r io.Reader) any {
+func ParseCommand(r io.Reader) (any, error) {
 	var cmd Command
-	binary.Read(r, binary.LittleEndian, &cmd)
+	if err := binary.Read(r, binary.LittleEndian, &cmd); err != nil {
+		return nil, err
+	}
 
 	switch cmd {
 	case CMDSet:
-		return parseSetCommand(r)
+		return parseSetCommand(r), nil
 	case CMDGet:
-		return parseGetCommand(r)
+		return parseGetCommand(r), nil
 	default:
-		panic("invalid command")
+		return nil, fmt.Errorf("unknown command: %v", cmd)
 	}
 }
 

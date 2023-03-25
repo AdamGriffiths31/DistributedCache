@@ -2,9 +2,12 @@ package main
 
 import (
 	distributedcache "DistributedCache/cache"
+	"DistributedCache/protocol"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"time"
 )
 
 type ServerOpts struct {
@@ -49,17 +52,35 @@ func (s *Server) handleConn(conn net.Conn) {
 		conn.Close()
 	}()
 
-	buf := make([]byte, 2048)
+	log.Println("Connection made:", conn.RemoteAddr())
+
 	for {
-		n, err := conn.Read(buf)
+		cmd, err := protocol.ParseCommand(conn)
 		if err != nil {
-			log.Printf("conn read error: %s\n", err)
+			if err == io.EOF {
+				break
+			}
+			log.Printf("handleConn - parse command error: %s\n", err)
 			break
 		}
+		fmt.Println("cmd", cmd)
 
-		go s.handleCommand(conn, buf[:n])
+		go s.handleCommand(conn, cmd)
+	}
+	log.Println("Connection closed:", conn.RemoteAddr())
+}
+
+func (s *Server) handleCommand(conn net.Conn, cmd any) {
+	switch v := cmd.(type) {
+	case *protocol.CommandSet:
+		s.handleSetCommand(conn, v)
+	case *protocol.CommandGet:
 	}
 }
 
-func (s *Server) handleCommand(conn net.Conn, rawCmd []byte) {
+func (s *Server) handleSetCommand(conn net.Conn, cmd *protocol.CommandSet) error {
+	if err := s.cache.Set(cmd.Key, cmd.Value, time.Duration(cmd.TTL)); err != nil {
+		return err
+	}
+	return nil
 }
